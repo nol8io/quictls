@@ -547,7 +547,19 @@ static int quic_change_cipher_state(SSL *s, int which)
                                       hash, hashlen,
                                       s->server_app_traffic_secret, hashlen, 1)
                 || !ssl_log_secret(s, SERVER_APPLICATION_LABEL,
-                                   s->server_app_traffic_secret, hashlen)) {
+                                   s->server_app_traffic_secret, hashlen)
+                /*
+                 * The exporter master secret, from the same handshake hash
+                 * through the server Finished, as tls13_change_cipher_state()
+                 * derives it: SSL_export_keying_material() exports from it.
+                 */
+                || !tls13_hkdf_expand(s, md, s->master_secret,
+                                      exporter_master_secret,
+                                      sizeof(exporter_master_secret)-1,
+                                      hash, hashlen,
+                                      s->exporter_master_secret, hashlen, 1)
+                || !ssl_log_secret(s, EXPORTER_SECRET_LABEL,
+                                   s->exporter_master_secret, hashlen)) {
                 /* SSLfatal() already called */
                 goto err;
             }
